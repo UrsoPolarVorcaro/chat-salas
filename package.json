@@ -1,0 +1,8 @@
+{
+  "name": "chat-salas",
+  "version": "1.0.0",
+  "description": "Chat em salas com código, fotos, vídeos, áudios e arquivos",
+  "main": "server.js",
+  "scripts": { "start": "node server.js" },
+  "engines": { "node": ">=18" }
+}

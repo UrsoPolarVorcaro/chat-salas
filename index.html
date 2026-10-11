@@ -1,0 +1,316 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sala de Chat</title>
+<style>
+:root{--bg:#0f1420;--panel:#171e2e;--panel2:#1f2840;--text:#e8ecf5;--muted:#8d98b3;--accent:#5b8cff;--mine:#2d4a8f;--border:#2a3550}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--text);font:16px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+button{font:inherit;cursor:pointer;border:0;border-radius:10px;padding:10px 14px;background:var(--accent);color:#fff}
+button.ghost{background:var(--panel2);color:var(--text);border:1px solid var(--border)}
+button:disabled{opacity:.5;cursor:default}
+input{font:inherit;background:var(--panel2);color:var(--text);border:1px solid var(--border);border-radius:10px;padding:11px 12px;width:100%}
+input:focus{outline:2px solid var(--accent);border-color:transparent}
+.hidden{display:none!important}
+.center{min-height:100%;display:flex;align-items:center;justify-content:center;padding:20px}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:24px;width:100%;max-width:420px}
+.card h1{margin:0 0 4px;font-size:22px}
+.card p{margin:0 0 16px;color:var(--muted);font-size:14px}
+.stack{display:flex;flex-direction:column;gap:10px}
+.row{display:flex;gap:8px}
+.sep{text-align:center;color:var(--muted);font-size:13px;margin:6px 0}
+.recent{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.recent button{padding:5px 10px;font-size:13px}
+.err{color:#ff8a8a;font-size:14px;min-height:20px}
+#chat{height:100%;display:flex;flex-direction:column}
+header{display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--panel);border-bottom:1px solid var(--border)}
+header .info{flex:1;min-width:0}
+header .code{font-weight:700;letter-spacing:2px;font-size:18px}
+header .who{color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+header button{padding:8px 10px;font-size:14px}
+#msgs{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:8px}
+.msg{max-width:min(85%,560px);background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:8px 12px;align-self:flex-start;word-wrap:break-word;overflow-wrap:anywhere}
+.msg.mine{align-self:flex-end;background:var(--mine);border-color:transparent}
+.msg .meta{font-size:12px;margin-bottom:2px;display:flex;gap:8px;justify-content:space-between}
+.msg .meta .t{color:var(--muted)}
+.msg .txt{white-space:pre-wrap}
+.msg a{color:#9cc0ff}
+.msg img,.msg video{max-width:100%;max-height:340px;border-radius:10px;display:block;margin-top:4px;background:#000}
+.msg img{cursor:zoom-in}
+.msg audio{width:260px;max-width:100%;margin-top:4px}
+.file{display:flex;gap:10px;align-items:center;margin-top:4px;text-decoration:none;color:inherit;background:rgba(255,255,255,.06);padding:8px 10px;border-radius:10px}
+.file .ic{font-size:24px}
+.file .fn{font-weight:600;font-size:14px}
+.file .sz{font-size:12px;color:var(--muted)}
+.sys{align-self:center;color:var(--muted);font-size:13px}
+#bar{padding:8px 12px 12px;background:var(--panel);border-top:1px solid var(--border)}
+#prog{height:4px;background:var(--panel2);border-radius:4px;margin-bottom:8px;overflow:hidden}
+#prog div{height:100%;width:0;background:var(--accent);transition:width .15s}
+#status{font-size:12px;color:var(--muted);min-height:16px;margin-bottom:4px}
+.compose{display:flex;gap:6px;align-items:center}
+.compose button{padding:10px 12px}
+.rec{background:#d63c3c!important;animation:pulse 1s infinite}
+@keyframes pulse{50%{opacity:.6}}
+#drop{position:fixed;inset:0;background:rgba(91,140,255,.25);border:3px dashed var(--accent);display:flex;align-items:center;justify-content:center;font-size:22px;z-index:10;pointer-events:none}
+#lightbox{position:fixed;inset:0;background:rgba(0,0,0,.9);display:flex;align-items:center;justify-content:center;z-index:20;cursor:zoom-out}
+#lightbox img{max-width:96%;max-height:96%}
+#toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:#000c;padding:8px 14px;border-radius:20px;font-size:14px;z-index:30}
+</style>
+</head>
+<body>
+
+<!-- Tela 1: nome -->
+<div id="vName" class="center hidden">
+  <div class="card stack">
+    <div><h1>💬 Sala de Chat</h1><p>Escolha um nome para aparecer nas conversas. Não precisa de cadastro.</p></div>
+    <input id="nameIn" maxlength="24" placeholder="Seu nome" autocomplete="nickname">
+    <button id="nameGo">Continuar</button>
+  </div>
+</div>
+
+<!-- Tela 2: criar / entrar -->
+<div id="vHome" class="center hidden">
+  <div class="card stack">
+    <div><h1>Olá, <span id="hiName"></span> 👋</h1><p>Crie uma sala nova ou entre numa com o código.</p></div>
+    <button id="mkRoom">➕ Criar sala nova</button>
+    <div class="sep">— ou —</div>
+    <input id="codeIn" maxlength="14" placeholder="Código da sala (ex: K7M2QX)" autocapitalize="characters" autocomplete="off" style="text-transform:uppercase;letter-spacing:2px">
+    <button id="joinRoom" class="ghost">Entrar na sala</button>
+    <div class="err" id="homeErr"></div>
+    <div id="recentBox" class="hidden"><div class="sep" style="text-align:left">Salas recentes</div><div class="recent" id="recent"></div></div>
+    <button id="chName" class="ghost" style="font-size:13px;padding:6px">Trocar nome</button>
+  </div>
+</div>
+
+<!-- Tela 3: chat -->
+<div id="chat" class="hidden">
+  <header>
+    <button class="ghost" id="back" title="Sair da sala">←</button>
+    <div class="info"><div class="code" id="roomCode"></div><div class="who" id="who"></div></div>
+    <button class="ghost" id="copyCode">📋 Código</button>
+    <button class="ghost" id="copyLink">🔗 Link</button>
+  </header>
+  <div id="msgs"></div>
+  <div id="bar">
+    <div id="prog" class="hidden"><div></div></div>
+    <div id="status"></div>
+    <div class="compose">
+      <button class="ghost" id="attach" title="Enviar foto, vídeo ou arquivo">📎</button>
+      <input type="file" id="file" multiple class="hidden">
+      <input id="text" placeholder="Escreva uma mensagem…" autocomplete="off" maxlength="4000">
+      <button class="ghost" id="mic" title="Gravar áudio">🎤</button>
+      <button id="send">Enviar</button>
+    </div>
+  </div>
+</div>
+
+<div id="drop" class="hidden">Solte para enviar</div>
+<div id="lightbox" class="hidden"><img alt=""></div>
+<div id="toast" class="hidden"></div>
+
+<script>
+const $ = id => document.getElementById(id);
+const ls = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+};
+let myName = ls.get('chat_name', '');
+let room = null, es = null, users = [], busy = false;
+
+function show(v) { for (const id of ['vName', 'vHome', 'chat']) $(id).classList.toggle('hidden', id !== v); }
+function toast(t) { const el = $('toast'); el.textContent = t; el.classList.remove('hidden'); clearTimeout(toast.t); toast.t = setTimeout(() => el.classList.add('hidden'), 2200); }
+const cleanCode = s => (s || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+
+/* ---------- nome ---------- */
+function goName() { show('vName'); $('nameIn').value = myName; $('nameIn').focus(); }
+function saveName() {
+  const n = $('nameIn').value.trim();
+  if (!n) return $('nameIn').focus();
+  myName = n.slice(0, 24); ls.set('chat_name', myName); goHome();
+  if (pendingCode) { const c = pendingCode; pendingCode = null; enter(c); }
+}
+let pendingCode = null;
+$('nameGo').onclick = saveName;
+$('nameIn').onkeydown = e => { if (e.key === 'Enter') saveName(); };
+$('chName').onclick = goName;
+
+/* ---------- home ---------- */
+function goHome() {
+  closeRoom(); show('vHome');
+  $('hiName').textContent = myName; $('homeErr').textContent = '';
+  const rec = ls.get('chat_recent', []);
+  $('recentBox').classList.toggle('hidden', !rec.length);
+  $('recent').innerHTML = '';
+  rec.forEach(c => { const b = document.createElement('button'); b.className = 'ghost'; b.textContent = c; b.onclick = () => enter(c); $('recent').appendChild(b); });
+}
+$('mkRoom').onclick = async () => {
+  try { const r = await fetch('/api/rooms', { method: 'POST' }); enter((await r.json()).code); }
+  catch { $('homeErr').textContent = 'Não consegui criar a sala. Tente de novo.'; }
+};
+$('joinRoom').onclick = () => enter(cleanCode($('codeIn').value));
+$('codeIn').onkeydown = e => { if (e.key === 'Enter') $('joinRoom').click(); };
+
+async function enter(code) {
+  if (!code) { $('homeErr').textContent = 'Digite o código da sala.'; return; }
+  try {
+    const r = await fetch('/api/rooms/' + code);
+    if (!r.ok) { $('homeErr').textContent = 'Sala não encontrada. Confira o código.'; return; }
+  } catch { $('homeErr').textContent = 'Sem conexão com o servidor.'; return; }
+  const rec = [code, ...ls.get('chat_recent', []).filter(c => c !== code)].slice(0, 6);
+  ls.set('chat_recent', rec);
+  openRoom(code);
+}
+
+/* ---------- sala ---------- */
+function openRoom(code) {
+  room = code; show('chat');
+  $('roomCode').textContent = code; $('msgs').innerHTML = ''; $('who').textContent = 'conectando…';
+  history.replaceState(null, '', '?sala=' + code);
+  connect();
+  $('text').focus();
+}
+function connect() {
+  if (es) es.close();
+  es = new EventSource(`/api/rooms/${room}/events?name=${encodeURIComponent(myName)}`);
+  es.onmessage = e => {
+    const d = JSON.parse(e.data);
+    if (d.type === 'history') { $('msgs').innerHTML = ''; d.messages.forEach(m => addMsg(m, false)); scrollDown(true); }
+    else if (d.type === 'msg') { const mine = d.msg.name === myName; addMsg(d.msg, !mine); if (!mine && document.hidden) document.title = '💬 Nova mensagem'; }
+    else if (d.type === 'presence') { users = d.users; $('who').textContent = `Você: ${myName} · online: ${[...new Set(users)].join(', ')}`; }
+  };
+  es.onerror = () => { $('who').textContent = 'reconectando…'; };
+}
+function closeRoom() { if (es) es.close(); es = null; room = null; history.replaceState(null, '', location.pathname); }
+$('back').onclick = goHome;
+$('copyCode').onclick = () => copy(room, 'Código copiado!');
+$('copyLink').onclick = () => copy(`${location.origin}/?sala=${room}`, 'Link copiado!');
+async function copy(t, msg) {
+  try { await navigator.clipboard.writeText(t); }
+  catch { const i = document.createElement('input'); i.value = t; document.body.appendChild(i); i.select(); document.execCommand('copy'); i.remove(); }
+  toast(msg);
+}
+document.addEventListener('visibilitychange', () => { if (!document.hidden) document.title = 'Sala de Chat'; });
+
+/* ---------- renderização ---------- */
+function hue(s) { let h = 0; for (const c of s) h = (h * 31 + c.charCodeAt(0)) % 360; return h; }
+function fmtSize(b) { return b < 1024 ? b + ' B' : b < 1048576 ? (b / 1024).toFixed(0) + ' KB' : (b / 1048576).toFixed(1) + ' MB'; }
+function linkify(el, text) {
+  const re = /(https?:\/\/[^\s<]+)/g; let last = 0, m;
+  while ((m = re.exec(text))) {
+    el.append(text.slice(last, m.index));
+    const a = document.createElement('a'); a.href = m[1]; a.target = '_blank'; a.rel = 'noopener noreferrer'; a.textContent = m[1]; el.append(a);
+    last = m.index + m[1].length;
+  }
+  el.append(text.slice(last));
+}
+function addMsg(m, notify) {
+  const box = $('msgs');
+  const near = box.scrollHeight - box.scrollTop - box.clientHeight < 120;
+  const d = document.createElement('div'); d.className = 'msg' + (m.name === myName ? ' mine' : '');
+  const meta = document.createElement('div'); meta.className = 'meta';
+  const n = document.createElement('b'); n.textContent = m.name; n.style.color = `hsl(${hue(m.name)} 80% 75%)`;
+  const t = document.createElement('span'); t.className = 't'; t.textContent = new Date(m.time).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  meta.append(n, t); d.append(meta);
+  if (m.text) { const x = document.createElement('div'); x.className = 'txt'; linkify(x, m.text); d.append(x); }
+  if (m.file) {
+    const f = m.file;
+    if (/^image\//.test(f.type)) { const i = document.createElement('img'); i.src = f.url; i.loading = 'lazy'; i.alt = f.name; i.onclick = () => { $('lightbox').firstElementChild.src = f.url; $('lightbox').classList.remove('hidden'); }; i.onload = () => { if (near) scrollDown(); }; d.append(i); }
+    else if (/^video\//.test(f.type)) { const v = document.createElement('video'); v.src = f.url; v.controls = true; v.preload = 'metadata'; v.playsInline = true; d.append(v); }
+    else if (/^audio\//.test(f.type)) { const a = document.createElement('audio'); a.src = f.url; a.controls = true; a.preload = 'metadata'; d.append(a); }
+    else {
+      const a = document.createElement('a'); a.className = 'file'; a.href = f.url; a.download = f.name;
+      a.innerHTML = '<span class="ic">📄</span><span><div class="fn"></div><div class="sz"></div></span>';
+      a.querySelector('.fn').textContent = f.name; a.querySelector('.sz').textContent = fmtSize(f.size) + ' · baixar'; d.append(a);
+    }
+  }
+  box.append(d);
+  if (near || m.name === myName) scrollDown();
+}
+function scrollDown(force) { const b = $('msgs'); b.scrollTop = b.scrollHeight; }
+$('lightbox').onclick = () => $('lightbox').classList.add('hidden');
+
+/* ---------- enviar ---------- */
+async function sendText() {
+  const t = $('text').value; if (!t.trim()) return;
+  $('text').value = '';
+  try {
+    const r = await fetch(`/api/rooms/${room}/messages`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: myName, text: t }) });
+    if (!r.ok) throw 0;
+  } catch { $('text').value = t; toast('Falha ao enviar. Tente de novo.'); }
+}
+$('send').onclick = sendText;
+$('text').onkeydown = e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendText(); } };
+
+function uploadOne(file, label) {
+  return new Promise(resolve => {
+    const x = new XMLHttpRequest();
+    const q = new URLSearchParams({ name: myName, filename: file.name || 'arquivo', type: file.type || 'application/octet-stream' });
+    x.open('POST', `/api/rooms/${room}/upload?${q}`);
+    $('prog').classList.remove('hidden');
+    x.upload.onprogress = e => { if (e.lengthComputable) { $('prog').firstElementChild.style.width = (e.loaded / e.total * 100) + '%'; $('status').textContent = `Enviando ${label}… ${Math.round(e.loaded / e.total * 100)}%`; } };
+    x.onload = () => { if (x.status !== 200) { let m = 'Falha ao enviar'; try { m = JSON.parse(x.responseText).error || m; } catch {} toast(m); } resolve(); };
+    x.onerror = () => { toast('Falha de conexão no envio'); resolve(); };
+    x.send(file);
+  });
+}
+async function uploadMany(files) {
+  if (!room || busy) return;
+  busy = true;
+  for (const f of files) {
+    if (f.size > 100 * 1024 * 1024) { toast(`${f.name} passa de 100 MB`); continue; }
+    await uploadOne(f, f.name || 'arquivo');
+  }
+  busy = false; $('prog').classList.add('hidden'); $('prog').firstElementChild.style.width = '0'; $('status').textContent = '';
+}
+$('attach').onclick = () => $('file').click();
+$('file').onchange = e => { uploadMany([...e.target.files]); e.target.value = ''; };
+
+// colar imagem (Ctrl+V)
+document.addEventListener('paste', e => {
+  if (!room) return;
+  const files = [...(e.clipboardData?.files || [])];
+  if (files.length) { e.preventDefault(); uploadMany(files.map(f => f.name && f.name !== 'image.png' ? f : new File([f], 'imagem-' + Date.now() + '.png', { type: f.type }))); }
+});
+// arrastar e soltar
+let dragN = 0;
+addEventListener('dragenter', e => { if (!room) return; e.preventDefault(); dragN++; $('drop').classList.remove('hidden'); });
+addEventListener('dragleave', () => { if (--dragN <= 0) { dragN = 0; $('drop').classList.add('hidden'); } });
+addEventListener('dragover', e => e.preventDefault());
+addEventListener('drop', e => { e.preventDefault(); dragN = 0; $('drop').classList.add('hidden'); if (room && e.dataTransfer.files.length) uploadMany([...e.dataTransfer.files]); });
+
+/* ---------- gravar áudio ---------- */
+let rec = null, chunks = [], recStream = null;
+$('mic').onclick = async () => {
+  if (rec) { rec.stop(); return; }
+  if (!navigator.mediaDevices?.getUserMedia) { toast('Gravação precisa de HTTPS (ou localhost)'); return; }
+  try {
+    recStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const mime = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg'].find(t => window.MediaRecorder && MediaRecorder.isTypeSupported(t)) || '';
+    rec = new MediaRecorder(recStream, mime ? { mimeType: mime } : undefined); chunks = [];
+    rec.ondataavailable = e => e.data.size && chunks.push(e.data);
+    rec.onstop = () => {
+      recStream.getTracks().forEach(t => t.stop());
+      const type = (rec.mimeType || 'audio/webm').split(';')[0];
+      const ext = type.includes('mp4') ? 'm4a' : type.includes('ogg') ? 'ogg' : 'webm';
+      const blob = new Blob(chunks, { type });
+      rec = null; $('mic').classList.remove('rec'); $('mic').textContent = '🎤';
+      if (blob.size > 500) uploadMany([new File([blob], `audio-${Date.now()}.${ext}`, { type })]);
+    };
+    rec.start(); $('mic').classList.add('rec'); $('mic').textContent = '⏹';
+    $('status').textContent = 'Gravando… toque em ⏹ para enviar';
+  } catch { toast('Sem permissão para usar o microfone'); }
+};
+
+/* ---------- início ---------- */
+(function init() {
+  const code = cleanCode(new URLSearchParams(location.search).get('sala'));
+  if (!myName) { pendingCode = code || null; goName(); return; }
+  goHome();
+  if (code) enter(code);
+})();
+</script>
+</body>
+</html>
